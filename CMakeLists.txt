@@ -140,6 +140,26 @@ else()
 endif()
 target_link_libraries(test_flags ${MM_LIBS})
 
+# Add aggressive BRL-CAD test program
+add_executable(test_aggressive_brlcad test_aggressive_brlcad.c)
+target_include_directories(test_aggressive_brlcad PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_aggressive_brlcad mmesh)
+else()
+  target_link_libraries(test_aggressive_brlcad mmesh-static)
+endif()
+target_link_libraries(test_aggressive_brlcad ${MM_LIBS})
+
+# Add optimal feature size test program
+add_executable(test_optimal_feature test_optimal_feature.c)
+target_include_directories(test_optimal_feature PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_optimal_feature mmesh)
+else()
+  target_link_libraries(test_optimal_feature mmesh-static)
+endif()
+target_link_libraries(test_optimal_feature ${MM_LIBS})
+
 # Local Variables:
 # tab-width: 8
 # mode: cmake

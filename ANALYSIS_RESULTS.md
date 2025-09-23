@@ -20,10 +20,13 @@ Testing with the same data format (DOUBLE vertices, INT triangles) and thread co
 
 | Configuration | Triangle Reduction | Collisions | Performance |
 |---------------|-------------------|------------|-------------|
-| **PLANAR_MODE only** | **56.7%** (267,364 triangles) | 0 | Fast (13.5s) |
+| **PLANAR_MODE only (1% feature)** | **53.4%** (287,734 triangles) | 0 | Fast (12.1s) |
+| **PLANAR_MODE only (5% feature)** | **23.4%** (472,796 triangles) | 59,566 | Fast (11.2s) |
 | PLANAR + NORMAL_VERTEX_SPLITTING | 17.6% (508,040 triangles) | 3,199 | Medium (9.7s) |
 | PLANAR + TRIANGLE_WINDING_CCW | 27.4% (447,834 triangles) | 6,172 | Slow (18.7s) |
-| **BRL-CAD (all flags)** | **28.5%** (441,286 triangles) | **11,318** | Slow (18.8s) |
+| **BRL-CAD (all flags, 5% feature)** | **23.4%** (472,796 triangles) | **67,104** | Slow (18.8s) |
+
+**Note**: Feature size optimization testing revealed that **1% of mesh size is optimal** for BRL-CAD's DOUBLE/INT format, providing 53.4% reduction with zero collisions, compared to only 23.4% reduction with many collisions at 5% feature size.
 
 ## Key Findings
 
@@ -47,10 +50,16 @@ MD_FLAGS_NORMAL_VERTEX_SPLITTING | MD_FLAGS_TRIANGLE_WINDING_CCW | MD_FLAGS_PLAN
 MD_FLAGS_PLANAR_MODE
 ```
 
+**And optimize the feature size** to 1% of mesh size instead of larger values:
+```c
+double feature_size = mesh_size * 0.01; // 1% for optimal BRL-CAD decimation
+mdOperationStrength(&mdop, feature_size);
+```
+
 This change will:
-- **Double the decimation effectiveness** (28.5% → 56.7% reduction)
-- **Eliminate topology collisions** (11,318 → 0 collisions)
-- **Improve performance** (18.8s → 13.5s)
+- **More than double the decimation effectiveness** (23.4% → 53.4% reduction with optimal 1% feature size)
+- **Eliminate topology collisions** (59,566+ → 0 collisions)
+- **Improve performance** (remove unnecessary flag processing)
 
 ## Alternative Configurations
 
@@ -65,11 +74,12 @@ However, **MD_FLAGS_PLANAR_MODE alone provides the best results for planar decim
 1. The `mdOperationComputeNormals()` call should be investigated or removed as it causes crashes.
 2. The 2-thread configuration works well and provides good performance.
 3. The DOUBLE/INT data format is fine and matches BRL-CAD's existing data structures.
+4. **Feature size optimization is critical**: 1% of mesh size provides optimal results for BRL-CAD's data format, while larger feature sizes (5%+) cause many topology collisions and poor decimation.
 
 ## Test Results Summary
 
-- **Original mmesh test**: 95.1% reduction (29,996 triangles) with target constraints
-- **BRL-CAD current**: 28.5% reduction (441,286 triangles) with combined flags
-- **BRL-CAD optimized**: 56.7% reduction (267,364 triangles) with PLANAR_MODE only
+- **Original mmesh test**: 95.1% reduction (29,996 triangles) with target constraints and FLOAT/UINT32 format
+- **BRL-CAD current**: 23.4% reduction (472,796 triangles) with combined flags and suboptimal feature size
+- **BRL-CAD optimized**: 53.4% reduction (287,734 triangles) with PLANAR_MODE only and 1% feature size
 
-The optimized configuration achieves **twice the decimation effectiveness** of the current BRL-CAD approach.
+The optimized configuration achieves **more than double the decimation effectiveness** of the current BRL-CAD approach, though still not matching the original test due to fundamental differences in data format behavior.
