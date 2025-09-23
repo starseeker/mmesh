@@ -70,7 +70,12 @@ if (HAVE_M_LIBRARY)
   set(M_LIBRARY m)
 endif (HAVE_M_LIBRARY)
 
-set(MM_LIBS ${M_LIBRARY} Threads::Threads)
+check_library_exists(dl dlopen "" HAVE_DL_LIBRARY)
+if (HAVE_DL_LIBRARY)
+  set(DL_LIBRARY dl)
+endif (HAVE_DL_LIBRARY)
+
+set(MM_LIBS ${M_LIBRARY} ${DL_LIBRARY} Threads::Threads)
 
 add_subdirectory(src)
 add_subdirectory(include)
