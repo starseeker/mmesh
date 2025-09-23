@@ -75,6 +75,16 @@ set(MM_LIBS ${M_LIBRARY} Threads::Threads)
 add_subdirectory(src)
 add_subdirectory(include)
 
+# Add test program
+add_executable(test_planar_decimation test_planar_decimation.c)
+target_include_directories(test_planar_decimation PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_planar_decimation mmesh)
+else()
+  target_link_libraries(test_planar_decimation mmesh-static)
+endif()
+target_link_libraries(test_planar_decimation ${MM_LIBS})
+
 # Local Variables:
 # tab-width: 8
 # mode: cmake
