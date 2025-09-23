@@ -3061,40 +3061,9 @@ static mdf mdEdgeCollapsePenalty( mdMesh *mesh, mdThreadData *tdata, mdi v0, mdi
     /* Apply global compactness penalty factor */
     penalty *= mesh->compactnesspenalty;
     
-    /* NEW: Apply geometric change-based cost adjustment for coplanar collapses */
-    if( mesh->operationflags & MD_FLAGS_PLANAR_MODE )
-    {
-      mdf planarity_deviation = mdCalculatePlanarityDeviation( mesh, v0, v1, collapsepoint );
-      
-      /* Define coplanar threshold (adjustable parameter) */
-      mdf coplanar_threshold = 0.001;  /* Very small deviation = coplanar */
-      
-      if( planarity_deviation < coplanar_threshold )
-      {
-        /* Dramatically reduce penalty for truly coplanar collapses */
-        penalty *= 0.01;  /* Reduce penalty by 99% for coplanar cases */
-        
-#if DEBUG_VERBOSE_COST
-        printf( "    COPLANAR COLLAPSE DETECTED: deviation=%e, penalty reduced by 99%%\n", planarity_deviation );
-#endif
-      }
-      else
-      {
-        /* Apply normal area-based penalty for non-coplanar cases */
-        penaltyfactor = sqrt( ( vertex0->quadric.area + vertex1->quadric.area ) * mesh->invfeaturesizearea );
-        penalty *= penaltyfactor * mesh->maxcollapsecost;
-        
-#if DEBUG_VERBOSE_COST
-        printf( "    NON-COPLANAR COLLAPSE: deviation=%e, normal penalty applied\n", planarity_deviation );
-#endif
-      }
-    }
-    else
-    {
-      /* Apply factor proportional to area compared to feature size, amplify/dampen with sqrt() */
-      penaltyfactor = sqrt( ( vertex0->quadric.area + vertex1->quadric.area ) * mesh->invfeaturesizearea );
-      penalty *= penaltyfactor * mesh->maxcollapsecost;
-    }
+    /* Apply factor proportional to area compared to feature size, amplify/dampen with sqrt() */
+    penaltyfactor = sqrt( ( vertex0->quadric.area + vertex1->quadric.area ) * mesh->invfeaturesizearea );
+    penalty *= penaltyfactor * mesh->maxcollapsecost;
     
 #if DEBUG_VERBOSE_COST
     printf( "    Penalty Total : %e (factor %f)\n", penalty, penaltyfactor );
@@ -3193,6 +3162,31 @@ static mdf mdSolveEdgeCollapse( mdMesh *mesh, mdi v0, mdi v1, mdf *point )
  #endif
   cost += sumbias;
 #endif
+
+  /* Apply coplanar reduction to final cost (including bias) for planar mode */
+  if( mesh->operationflags & MD_FLAGS_PLANAR_MODE )
+  {
+    mdf planarity_deviation = mdCalculatePlanarityDeviation( mesh, v0, v1, point );
+    
+    /* More aggressive coplanar threshold for better interior triangle decimation */
+    mdf coplanar_threshold = 0.01;  /* Increased from 0.001 for more aggressive decimation */
+    
+    if( planarity_deviation < coplanar_threshold )
+    {
+      /* Dramatically reduce total cost for truly coplanar collapses */
+      cost *= 0.001;  /* Even more aggressive: reduce cost by 99.9% for coplanar cases */
+      
+#if DEBUG_VERBOSE_COST
+      printf( "      COPLANAR COLLAPSE DETECTED: deviation=%e, final cost reduced by 99.9%% to %e\n", planarity_deviation, cost );
+#endif
+    }
+    else
+    {
+#if DEBUG_VERBOSE_COST
+      printf( "      NON-COPLANAR COLLAPSE: deviation=%e, normal cost %e\n", planarity_deviation, cost );
+#endif
+    }
+  }
 
   return cost;
 }
