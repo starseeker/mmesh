@@ -85,6 +85,16 @@ else()
 endif()
 target_link_libraries(test_planar_decimation ${MM_LIBS})
 
+# Add mixed geometry test program
+add_executable(test_mixed_geometry test_mixed_geometry.c)
+target_include_directories(test_mixed_geometry PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_mixed_geometry mmesh)
+else()
+  target_link_libraries(test_mixed_geometry mmesh-static)
+endif()
+target_link_libraries(test_mixed_geometry ${MM_LIBS})
+
 # Local Variables:
 # tab-width: 8
 # mode: cmake
