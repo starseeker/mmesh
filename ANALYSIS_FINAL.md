@@ -44,7 +44,7 @@ The investigation focused on three main concerns:
 
 ## Recommendations for BRL-CAD
 
-### Primary Recommendation: Remove CCW Flag
+### Primary Recommendation: Optimize Flags and Add Vertex Target
 
 **Change from:**
 ```c
@@ -53,13 +53,15 @@ mdMeshDecimation(&mdop, 2, MD_FLAGS_NORMAL_VERTEX_SPLITTING | MD_FLAGS_TRIANGLE_
 
 **To:**
 ```c
+// For aggressive reduction (e.g., target 30k triangles)
+mdop.targetvertexcountmax = 15000;  // ~30k triangles
 mdMeshDecimation(&mdop, 2, MD_FLAGS_PLANAR_MODE);
 ```
 
 **Benefits:**
-- **33% more effective decimation** (38.9% vs 26.0% triangle reduction)
-- **Eliminates spurious edge collisions** (0 vs 11 collisions)
-- **Faster processing** (removes computational overhead)
+- **95.1% reduction effectiveness** (vs 56.6% without vertex target)
+- **Reaches specific triangle targets** (e.g., 30k triangles from 616k)
+- **Faster processing** (removes CCW computational overhead)
 - **Maintains consistent CCW output** (winding consistency unchanged)
 
 ### Secondary Recommendation: Remove NORMAL_VERTEX_SPLITTING if Possible
@@ -101,12 +103,14 @@ Each check involves:
 ### Why DOUBLE/INT Works Correctly
 
 **Verified Performance**: DOUBLE + INT format achieves identical decimation effectiveness to other formats:
-- 1% feature size: 287,748 triangles (53.4% reduction) ✓
+- Natural reduction: 287,748 triangles (53.4% reduction) with 1% feature size ✓
+- Aggressive reduction: 29,996 triangles (95.1% reduction) with `targetvertexcountmax = 15000` ✓
+- Performance: 20% faster than FLOAT + UINT32 for aggressive reduction ✓
 - Hash functions properly handle 32-bit indices regardless of signedness ✓
 - Threading synchronization works identically across data types ✓
 - No precision or overflow issues detected ✓
 
-**Note on Triangle Count Targets**: For very low triangle targets (e.g., 30k from 616k), the limitation is geometric, not format-related. Even extremely aggressive feature sizes (0.002% of mesh size) cannot overcome fundamental mesh topology constraints that prevent excessive reduction.
+**Key Discovery**: Previous concerns about 30k triangle targets were due to missing `targetvertexcountmax` parameter, not data type limitations. DOUBLE + INT can achieve the same aggressive reduction as any other format when properly configured.
 
 ## Implementation Notes
 
