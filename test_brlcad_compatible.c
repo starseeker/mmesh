@@ -18,7 +18,7 @@ typedef struct {
 typedef struct {
     DoubleVertex *vertices;
     IntTriangle *triangles;
-    DoubleVertex *face_normals;
+    DoubleVertex *vertex_normals; // Changed from face_normals to vertex_normals
     size_t vertex_count;
     size_t triangle_count;
     size_t vertex_alloc; // Total allocated vertex space
@@ -50,15 +50,15 @@ int load_obj_brlcad_format(const char *filename, BRLCADMesh *mesh) {
     size_t extra_vertices = vertex_count / 4; // Allocate 25% extra vertices for splitting
     mesh->vertices = malloc((vertex_count + extra_vertices) * sizeof(DoubleVertex));
     mesh->triangles = malloc(face_count * sizeof(IntTriangle));
-    mesh->face_normals = malloc(face_count * sizeof(DoubleVertex));
-    if (!mesh->vertices || !mesh->triangles || !mesh->face_normals) {
+    mesh->vertex_normals = malloc((vertex_count + extra_vertices) * sizeof(DoubleVertex)); // Allocate for all vertices including extra
+    if (!mesh->vertices || !mesh->triangles || !mesh->vertex_normals) {
         printf("Failed to allocate memory\n");
         fclose(file);
         return 0;
     }
     
-    printf("Allocated %zu vertices (+ %zu extra for splitting), %zu triangles, %zu normals\n", 
-           vertex_count, extra_vertices, face_count, face_count);
+    printf("Allocated %zu vertices (+ %zu extra for splitting), %zu triangles, %zu vertex normals\n", 
+           vertex_count, extra_vertices, face_count, vertex_count + extra_vertices);
 
     // Second pass: load data
     rewind(file);
@@ -95,12 +95,12 @@ int load_obj_brlcad_format(const char *filename, BRLCADMesh *mesh) {
 }
 
 void compute_initial_face_normals(BRLCADMesh *mesh) {
-    printf("Allocating face normals array (will be computed by mmesh)...\n");
-    // Initialize normals to zero - let mmesh compute them
-    for (size_t i = 0; i < mesh->triangle_count; i++) {
-        mesh->face_normals[i].x = 0.0;
-        mesh->face_normals[i].y = 0.0;
-        mesh->face_normals[i].z = 0.0;
+    printf("Initializing vertex normals array (will be computed by mmesh)...\n");
+    // Initialize vertex normals to zero - let mmesh compute them
+    for (size_t i = 0; i < mesh->vertex_alloc; i++) {
+        mesh->vertex_normals[i].x = 0.0;
+        mesh->vertex_normals[i].y = 0.0;
+        mesh->vertex_normals[i].z = 0.0;
     }
 }
 
@@ -191,9 +191,8 @@ int main(int argc, char **argv) {
     printf("  Vertex allocation: %zu (extra %zu for splitting)\n", mdop.vertexalloc, mesh.vertex_alloc - mesh.vertex_count);
     
     mdOperationStrength(&mdop, fsize);
-    // Add mdOperationComputeNormals like BRL-CAD does
-    printf("Setting up normals computation...\n");
-    mdOperationComputeNormals(&mdop, mesh.face_normals, MD_FORMAT_DOUBLE, 3*sizeof(double));
+    // Skip mdOperationComputeNormals to test if this is causing the segfault
+    // mdOperationComputeNormals(&mdop, mesh.vertex_normals, MD_FORMAT_DOUBLE, 3*sizeof(double));
 
     long final_triangle_count = 0;
     mdOperationStatusCallback(&mdop, status_callback_brlcad, &final_triangle_count, 1000);
@@ -232,7 +231,7 @@ int main(int argc, char **argv) {
                         MD_FORMAT_DOUBLE, 3*sizeof(double), mesh.triangle_count,
                         mesh.triangles, MD_FORMAT_INT, 3*sizeof(int));
         mdOperationStrength(&mdop, fsize);
-        mdOperationComputeNormals(&mdop, mesh.face_normals, MD_FORMAT_DOUBLE, 3*sizeof(double));
+        mdOperationComputeNormals(&mdop, mesh.vertex_normals, MD_FORMAT_DOUBLE, 3*sizeof(double));
         mdOperationStatusCallback(&mdop, status_callback_brlcad, NULL, 1000);
 
         start = clock();
@@ -252,7 +251,7 @@ int main(int argc, char **argv) {
     // Cleanup
     free(mesh.vertices);
     free(mesh.triangles);
-    free(mesh.face_normals);
+    free(mesh.vertex_normals);
 
     return 0;
 }

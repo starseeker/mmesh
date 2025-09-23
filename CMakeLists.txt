@@ -110,6 +110,16 @@ else()
 endif()
 target_link_libraries(test_brlcad_compatible ${MM_LIBS})
 
+# Add comparison test program
+add_executable(test_comparison test_comparison.c)
+target_include_directories(test_comparison PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_comparison mmesh)
+else()
+  target_link_libraries(test_comparison mmesh-static)
+endif()
+target_link_libraries(test_comparison ${MM_LIBS})
+
 # Local Variables:
 # tab-width: 8
 # mode: cmake
