@@ -120,6 +120,26 @@ else()
 endif()
 target_link_libraries(test_comparison ${MM_LIBS})
 
+# Add isolation test program
+add_executable(test_isolation test_isolation.c)
+target_include_directories(test_isolation PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_isolation mmesh)
+else()
+  target_link_libraries(test_isolation mmesh-static)
+endif()
+target_link_libraries(test_isolation ${MM_LIBS})
+
+# Add flags test program
+add_executable(test_flags test_flags.c)
+target_include_directories(test_flags PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_flags mmesh)
+else()
+  target_link_libraries(test_flags mmesh-static)
+endif()
+target_link_libraries(test_flags ${MM_LIBS})
+
 # Local Variables:
 # tab-width: 8
 # mode: cmake
