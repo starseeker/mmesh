@@ -44,25 +44,47 @@ The investigation focused on three main concerns:
 
 ## Recommendations for BRL-CAD
 
-### Primary Recommendation: Optimize Flags and Add Vertex Target
+### **Primary Recommendation: Add Automatic Target Calculation**
 
-**Change from:**
-```c
-mdMeshDecimation(&mdop, 2, MD_FLAGS_NORMAL_VERTEX_SPLITTING | MD_FLAGS_TRIANGLE_WINDING_CCW | MD_FLAGS_PLANAR_MODE);
-```
+The key insight is that `targetvertexcountmax` serves a different purpose than `featuresize`:
+- **featuresize**: Controls geometric quality and detail preservation  
+- **targetvertexcountmax**: Prevents stalling on high-cost edges (large planar surfaces)
 
-**To:**
+**Recommended Implementation:**
+
 ```c
-// For aggressive reduction (e.g., target 30k triangles)
-mdop.targetvertexcountmax = 15000;  // ~30k triangles
+mdOperationInit(&mdop);
+mdOperationData(&mdop, bot->num_vertices, bot->vertices,
+                MD_FORMAT_DOUBLE, 3*sizeof(double), bot->num_faces,
+                bot->faces, MD_FORMAT_INT, 3*sizeof(int));
+
+// Existing feature size calculation (unchanged)
+fastf_t fsize = pow(feature_size, 2.0 / 3.0) * pow(2.0, 4.0 / 3.0);
+mdOperationStrength(&mdop, fsize);
+
+// NEW: Add automatic target calculation to prevent stalling
+if (target_triangle_count > 0 && target_triangle_count < bot->num_faces * 0.8) {
+    mdop.targetvertexcountmax = target_triangle_count / 2;  // Rough vertex target
+    
+    // Ensure reasonable bounds
+    if (mdop.targetvertexcountmax < 1000) mdop.targetvertexcountmax = 1000;
+    if (mdop.targetvertexcountmax > bot->num_vertices / 2) 
+        mdop.targetvertexcountmax = bot->num_vertices / 2;
+}
+
 mdMeshDecimation(&mdop, 2, MD_FLAGS_PLANAR_MODE);
 ```
 
-**Benefits:**
-- **95.1% reduction effectiveness** (vs 56.6% without vertex target)
-- **Reaches specific triangle targets** (e.g., 30k triangles from 616k)
-- **Faster processing** (removes CCW computational overhead)
-- **Maintains consistent CCW output** (winding consistency unchanged)
+**Why This Solves the Stalling Issue:**
+- Without `targetvertexcountmax`: Algorithm rejects edges with cost > maxcollapsecost (stalls at ~267k triangles)
+- With `targetvertexcountmax`: Uses step-based processing that gradually increases cost thresholds, enabling aggressive reduction to specific targets
+
+**Alternative Approach (Reduction Factor):**
+```c
+// For general aggressive reduction without specific triangle target
+double reduction_factor = 0.95;  // 95% reduction desired
+mdop.targetvertexcountmax = (size_t)(bot->num_vertices * (1.0 - reduction_factor));
+```
 
 ### Secondary Recommendation: Remove NORMAL_VERTEX_SPLITTING if Possible
 
