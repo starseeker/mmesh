@@ -2219,7 +2219,7 @@ static mdf mdEdgeCollapsePenaltyTriangle( mdf *newpoint, mdf *oldpoint, mdf *lef
   if( meshflags & MD_FLAGS_PLANAR_MODE )
   {
     /* Detect planar normal Z inversion */
-    if( ( oldnormal[2] * newnormal[2] ) <= 0.0 )
+    if( ( oldnormal[2] * newnormal[2] ) < 0.0 )
     {
 #if DEBUG_VERBOSE_COST >= 2
       printf( "      !! Normal Z inversion denied in planar mode %f -> %f\n", oldnormal[2], newnormal[2] );
@@ -2302,7 +2302,7 @@ static float mdEdgeCollapsePenaltyTriangleSSE4p1f( float *newpoint, float *oldpo
   {
     /* Detect planar normal Z inversion */
     invcheck = _mm_mul_ps( oldnormal, newnormal );
-    if( _mm_comile_ss( _mm_shuffle_ps( invcheck, invcheck, _MM_SHUFFLE(3,3,3,3) ), _mm_set_ss( 0.0f ) ) )
+    if( _mm_comilt_ss( _mm_shuffle_ps( invcheck, invcheck, _MM_SHUFFLE(3,3,3,3) ), _mm_set_ss( 0.0f ) ) )
     {
 #if DEBUG_VERBOSE_COST >= 2
       printf( "      !! Normal Z inversion denied in planar mode\n" );
@@ -2412,7 +2412,7 @@ static double mdEdgeCollapsePenaltyTriangleSSE4p1d( double *newpoint, double *ol
   {
     /* Detect planar normal Z inversion */
     invcheck = _mm_mul_sd( oldnormal1, newnormal1 );
-    if( _mm_comile_sd( invcheck, _mm_set_sd( 0.0 ) ) )
+    if( _mm_comilt_sd( invcheck, _mm_set_sd( 0.0 ) ) )
     {
 #if DEBUG_VERBOSE_COST >= 2
       printf( "      !! Normal Z inversion denied in planar mode %f -> %f\n", _mm_cvtsd_f64( oldnormal1 ), _mm_cvtsd_f64( newnormal1 ) );
@@ -2480,6 +2480,7 @@ static float mdEdgeCollapsePenaltyTriangleSSE3f( float *newpoint, float *oldpoin
 {
   float penalty, compactness;
   __m128 left, vecta, oldvectb, oldvectc, newvectb, newvectc, oldnormal, newnormal;
+  __m128 invcheck;
   __m128 norm, oldmagnitude, newmagnitude, oldcompactness, newcompactness;
   /* Normal of old triangle */
   left = _mm_load_ps( leftpoint );
@@ -2499,7 +2500,7 @@ static float mdEdgeCollapsePenaltyTriangleSSE3f( float *newpoint, float *oldpoin
   {
     /* Detect planar normal Z inversion */
     invcheck = _mm_mul_ps( oldnormal, newnormal );
-    if( _mm_comile_ss( _mm_shuffle_ps( invcheck, invcheck, _MM_SHUFFLE(3,3,3,3) ), _mm_set_ss( 0.0f ) ) )
+    if( _mm_comilt_ss( _mm_shuffle_ps( invcheck, invcheck, _MM_SHUFFLE(3,3,3,3) ), _mm_set_ss( 0.0f ) ) )
     {
 #if DEBUG_VERBOSE_COST >= 2
       printf( "      !! Normal Z inversion denied in planar mode\n" );
@@ -2613,7 +2614,7 @@ static double mdEdgeCollapsePenaltyTriangleSSE3d( double *newpoint, double *oldp
   {
     /* Detect planar normal Z inversion */
     invcheck = _mm_mul_sd( oldnormal1, newnormal1 );
-    if( _mm_comile_sd( invcheck, _mm_set_sd( 0.0 ) ) )
+    if( _mm_comilt_sd( invcheck, _mm_set_sd( 0.0 ) ) )
     {
 #if DEBUG_VERBOSE_COST >= 2
       printf( "      !! Normal Z inversion denied in planar mode %f -> %f\n", _mm_cvtsd_f64( oldnormal1 ), _mm_cvtsd_f64( newnormal1 ) );
@@ -2735,7 +2736,7 @@ static double mdEdgeCollapsePenaltyTriangleSSE2d( double *newpoint, double *oldp
   {
     /* Detect planar normal Z inversion */
     invcheck = _mm_mul_sd( oldnormal1, newnormal1 );
-    if( _mm_comile_sd( invcheck, _mm_set_sd( 0.0 ) ) )
+    if( _mm_comilt_sd( invcheck, _mm_set_sd( 0.0 ) ) )
     {
 #if DEBUG_VERBOSE_COST >= 2
       printf( "      !! Normal Z inversion denied in planar mode %f -> %f\n", _mm_cvtsd_f64( oldnormal1 ), _mm_cvtsd_f64( newnormal1 ) );
