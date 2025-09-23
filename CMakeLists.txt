@@ -100,6 +100,66 @@ else()
 endif()
 target_link_libraries(test_mixed_geometry ${MM_LIBS})
 
+# Add BRL-CAD compatible test program
+add_executable(test_brlcad_compatible test_brlcad_compatible.c)
+target_include_directories(test_brlcad_compatible PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_brlcad_compatible mmesh)
+else()
+  target_link_libraries(test_brlcad_compatible mmesh-static)
+endif()
+target_link_libraries(test_brlcad_compatible ${MM_LIBS})
+
+# Add comparison test program
+add_executable(test_comparison test_comparison.c)
+target_include_directories(test_comparison PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_comparison mmesh)
+else()
+  target_link_libraries(test_comparison mmesh-static)
+endif()
+target_link_libraries(test_comparison ${MM_LIBS})
+
+# Add isolation test program
+add_executable(test_isolation test_isolation.c)
+target_include_directories(test_isolation PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_isolation mmesh)
+else()
+  target_link_libraries(test_isolation mmesh-static)
+endif()
+target_link_libraries(test_isolation ${MM_LIBS})
+
+# Add flags test program
+add_executable(test_flags test_flags.c)
+target_include_directories(test_flags PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_flags mmesh)
+else()
+  target_link_libraries(test_flags mmesh-static)
+endif()
+target_link_libraries(test_flags ${MM_LIBS})
+
+# Add aggressive BRL-CAD test program
+add_executable(test_aggressive_brlcad test_aggressive_brlcad.c)
+target_include_directories(test_aggressive_brlcad PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_aggressive_brlcad mmesh)
+else()
+  target_link_libraries(test_aggressive_brlcad mmesh-static)
+endif()
+target_link_libraries(test_aggressive_brlcad ${MM_LIBS})
+
+# Add optimal feature size test program
+add_executable(test_optimal_feature test_optimal_feature.c)
+target_include_directories(test_optimal_feature PRIVATE include)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(test_optimal_feature mmesh)
+else()
+  target_link_libraries(test_optimal_feature mmesh-static)
+endif()
+target_link_libraries(test_optimal_feature ${MM_LIBS})
+
 # Local Variables:
 # tab-width: 8
 # mode: cmake
