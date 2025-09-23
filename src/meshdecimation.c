@@ -3168,16 +3168,16 @@ static mdf mdSolveEdgeCollapse( mdMesh *mesh, mdi v0, mdi v1, mdf *point )
   {
     mdf planarity_deviation = mdCalculatePlanarityDeviation( mesh, v0, v1, point );
     
-    /* Define coplanar threshold (adjustable parameter) */
-    mdf coplanar_threshold = 0.001;  /* Very small deviation = coplanar */
+    /* More aggressive coplanar threshold for better interior triangle decimation */
+    mdf coplanar_threshold = 0.01;  /* Increased from 0.001 for more aggressive decimation */
     
     if( planarity_deviation < coplanar_threshold )
     {
       /* Dramatically reduce total cost for truly coplanar collapses */
-      cost *= 0.01;  /* Reduce cost by 99% for coplanar cases */
+      cost *= 0.001;  /* Even more aggressive: reduce cost by 99.9% for coplanar cases */
       
 #if DEBUG_VERBOSE_COST
-      printf( "      COPLANAR COLLAPSE DETECTED: deviation=%e, final cost reduced by 99%% to %e\n", planarity_deviation, cost );
+      printf( "      COPLANAR COLLAPSE DETECTED: deviation=%e, final cost reduced by 99.9%% to %e\n", planarity_deviation, cost );
 #endif
     }
     else
