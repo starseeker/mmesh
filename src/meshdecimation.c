@@ -2911,6 +2911,120 @@ static mdf mdEdgeCollapsePenaltyTriRefs( mdMesh *mesh, mdThreadData *tdata, mdi 
 }
 
 
+/* Calculate planarity deviation for edge collapse to detect coplanar cases */
+static mdf mdCalculatePlanarityDeviation( mdMesh *mesh, mdi v0, mdi v1, mdf *collapsepoint )
+{
+  mdi *trireflist;
+  mdi trirefcount, index, triindex;
+  mdTriangle *tri;
+  mdVertex *vertex0, *vertex1, *vertex2, *othervertex;
+  mdf oldnormal[3], newnormal[3], vecta[3], vectb[3];
+  mdf dotproduct, maxdeviation, deviation;
+  int found_triangles;
+
+  vertex0 = &mesh->vertexlist[ v0 ];
+  vertex1 = &mesh->vertexlist[ v1 ];
+  
+  maxdeviation = 0.0;
+  found_triangles = 0;
+
+  /* Check triangles adjacent to vertex0 */
+  trireflist = &mesh->trireflist[ vertex0->trirefbase ];
+  trirefcount = vertex0->trirefcount;
+  for( index = 0 ; index < trirefcount ; index++ )
+  {
+    triindex = trireflist[ index ];
+    tri = ADDRESS( mesh->trilist, triindex * mesh->trisize );
+    
+    /* Skip triangles that contain both v0 and v1 (will be deleted) */
+    if( ( tri->v[0] == v1 ) || ( tri->v[1] == v1 ) || ( tri->v[2] == v1 ) )
+      continue;
+    
+    /* Find the third vertex (not v0) */
+    othervertex = NULL;
+    if( tri->v[0] == v0 )
+      othervertex = ( tri->v[1] != v1 ? &mesh->vertexlist[ tri->v[1] ] : &mesh->vertexlist[ tri->v[2] ] );
+    else if( tri->v[1] == v0 )
+      othervertex = ( tri->v[0] != v1 ? &mesh->vertexlist[ tri->v[0] ] : &mesh->vertexlist[ tri->v[2] ] );
+    else if( tri->v[2] == v0 )
+      othervertex = ( tri->v[0] != v1 ? &mesh->vertexlist[ tri->v[0] ] : &mesh->vertexlist[ tri->v[1] ] );
+    
+    if( !othervertex )
+      continue;
+    
+    found_triangles++;
+    
+    /* Calculate old triangle normal */
+    MD_VectorSubStore( vecta, vertex0->point, vertex1->point );
+    MD_VectorSubStore( vectb, othervertex->point, vertex1->point );
+    MD_VectorCrossProduct( oldnormal, vecta, vectb );
+    MD_VectorNormalize( oldnormal );
+    
+    /* Calculate new triangle normal after collapse */
+    MD_VectorSubStore( vecta, collapsepoint, vertex1->point );
+    MD_VectorSubStore( vectb, othervertex->point, vertex1->point );
+    MD_VectorCrossProduct( newnormal, vecta, vectb );
+    MD_VectorNormalize( newnormal );
+    
+    /* Calculate deviation as 1 - dot product */
+    dotproduct = MD_VectorDotProduct( oldnormal, newnormal );
+    deviation = 1.0 - mdfabs( dotproduct );
+    
+    if( deviation > maxdeviation )
+      maxdeviation = deviation;
+  }
+
+  /* Check triangles adjacent to vertex1 (similar process) */
+  trireflist = &mesh->trireflist[ vertex1->trirefbase ];
+  trirefcount = vertex1->trirefcount;
+  for( index = 0 ; index < trirefcount ; index++ )
+  {
+    triindex = trireflist[ index ];
+    tri = ADDRESS( mesh->trilist, triindex * mesh->trisize );
+    
+    /* Skip triangles that contain both v0 and v1 (will be deleted) */
+    if( ( tri->v[0] == v0 ) || ( tri->v[1] == v0 ) || ( tri->v[2] == v0 ) )
+      continue;
+    
+    /* Find the third vertex (not v1) */
+    othervertex = NULL;
+    if( tri->v[0] == v1 )
+      othervertex = ( tri->v[1] != v0 ? &mesh->vertexlist[ tri->v[1] ] : &mesh->vertexlist[ tri->v[2] ] );
+    else if( tri->v[1] == v1 )
+      othervertex = ( tri->v[0] != v0 ? &mesh->vertexlist[ tri->v[0] ] : &mesh->vertexlist[ tri->v[2] ] );
+    else if( tri->v[2] == v1 )
+      othervertex = ( tri->v[0] != v0 ? &mesh->vertexlist[ tri->v[0] ] : &mesh->vertexlist[ tri->v[1] ] );
+    
+    if( !othervertex )
+      continue;
+    
+    found_triangles++;
+    
+    /* Calculate old triangle normal */
+    MD_VectorSubStore( vecta, vertex1->point, vertex0->point );
+    MD_VectorSubStore( vectb, othervertex->point, vertex0->point );
+    MD_VectorCrossProduct( oldnormal, vecta, vectb );
+    MD_VectorNormalize( oldnormal );
+    
+    /* Calculate new triangle normal after collapse */
+    MD_VectorSubStore( vecta, collapsepoint, vertex0->point );
+    MD_VectorSubStore( vectb, othervertex->point, vertex0->point );
+    MD_VectorCrossProduct( newnormal, vecta, vectb );
+    MD_VectorNormalize( newnormal );
+    
+    /* Calculate deviation as 1 - dot product */
+    dotproduct = MD_VectorDotProduct( oldnormal, newnormal );
+    deviation = 1.0 - mdfabs( dotproduct );
+    
+    if( deviation > maxdeviation )
+      maxdeviation = deviation;
+  }
+
+  /* Return maximum deviation found (0.0 = perfectly coplanar, 1.0 = maximum change) */
+  return found_triangles > 0 ? maxdeviation : 1.0;
+}
+
+
 static mdf mdEdgeCollapsePenalty( mdMesh *mesh, mdThreadData *tdata, mdi v0, mdi v1, mdf *collapsepoint, int *denyflag )
 {
   mdf penalty, penaltyfactor;
@@ -2946,9 +3060,42 @@ static mdf mdEdgeCollapsePenalty( mdMesh *mesh, mdThreadData *tdata, mdi v0, mdi
 #endif
     /* Apply global compactness penalty factor */
     penalty *= mesh->compactnesspenalty;
-    /* Apply factor proportional to area compared to feature size, amplify/dampen with sqrt() */
-    penaltyfactor = sqrt( ( vertex0->quadric.area + vertex1->quadric.area ) * mesh->invfeaturesizearea );
-    penalty *= penaltyfactor * mesh->maxcollapsecost;
+    
+    /* NEW: Apply geometric change-based cost adjustment for coplanar collapses */
+    if( mesh->operationflags & MD_FLAGS_PLANAR_MODE )
+    {
+      mdf planarity_deviation = mdCalculatePlanarityDeviation( mesh, v0, v1, collapsepoint );
+      
+      /* Define coplanar threshold (adjustable parameter) */
+      mdf coplanar_threshold = 0.001;  /* Very small deviation = coplanar */
+      
+      if( planarity_deviation < coplanar_threshold )
+      {
+        /* Dramatically reduce penalty for truly coplanar collapses */
+        penalty *= 0.01;  /* Reduce penalty by 99% for coplanar cases */
+        
+#if DEBUG_VERBOSE_COST
+        printf( "    COPLANAR COLLAPSE DETECTED: deviation=%e, penalty reduced by 99%%\n", planarity_deviation );
+#endif
+      }
+      else
+      {
+        /* Apply normal area-based penalty for non-coplanar cases */
+        penaltyfactor = sqrt( ( vertex0->quadric.area + vertex1->quadric.area ) * mesh->invfeaturesizearea );
+        penalty *= penaltyfactor * mesh->maxcollapsecost;
+        
+#if DEBUG_VERBOSE_COST
+        printf( "    NON-COPLANAR COLLAPSE: deviation=%e, normal penalty applied\n", planarity_deviation );
+#endif
+      }
+    }
+    else
+    {
+      /* Apply factor proportional to area compared to feature size, amplify/dampen with sqrt() */
+      penaltyfactor = sqrt( ( vertex0->quadric.area + vertex1->quadric.area ) * mesh->invfeaturesizearea );
+      penalty *= penaltyfactor * mesh->maxcollapsecost;
+    }
+    
 #if DEBUG_VERBOSE_COST
     printf( "    Penalty Total : %e (factor %f)\n", penalty, penaltyfactor );
 #endif
