@@ -648,7 +648,7 @@ static mof moLookAheadScore( moMesh *mesh, moThreadData *tdata, moTriangle *tri 
   moVertex *vertex;
   moTriangle *tricheck;
 
-  bestscore = 0.0f;
+  score = 0.0f, bestscore = 0.0f;
   for( axisindex = 0 ; axisindex < 3 ; axisindex++ )
   {
     vertexindex = tri->v[axisindex];
