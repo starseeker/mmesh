@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
   float *vertices;
   unsigned int *indices;
   size_t vertex_count, tri_count;
-  long max_triangles = 1000;
+  long max_triangles;
   int result;
   
   printf("Triangle Budget Decimation Example\n");

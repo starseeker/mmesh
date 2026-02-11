@@ -49,6 +49,12 @@
 /* Enable for debug output in budget decimation */
 #define DEBUG_BUDGET_DECIMATION 0
 
+/* Triangle budget decimation constants */
+#define MD_BUDGET_FEATURE_SIZE_CONVERGENCE_THRESHOLD 0.001
+#define MD_BUDGET_AGGRESSIVE_MULTIPLIER_1 2.0
+#define MD_BUDGET_AGGRESSIVE_MULTIPLIER_2 5.0
+#define MD_BUDGET_AGGRESSIVE_MULTIPLIER_3 10.0
+
 
 ////
 
@@ -6535,8 +6541,8 @@ static double mdEstimateMeshScale( mdOperation *operation )
   float *vertexf;
   
   /* Initialize bounds */
-  min[0] = min[1] = min[2] = 1e30;
-  max[0] = max[1] = max[2] = -1e30;
+  min[0] = min[1] = min[2] = DBL_MAX;
+  max[0] = max[1] = max[2] = -DBL_MAX;
   
   /* Compute bounding box based on vertex format */
   if( operation->vertexformat == MD_FORMAT_DOUBLE )
@@ -6738,7 +6744,7 @@ int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int thre
     featuresize_mid = sqrt( featuresize_low * featuresize_high );
     
     /* Check for convergence (search range too narrow) */
-    if( (featuresize_high - featuresize_low) / featuresize_high < 0.001 )
+    if( (featuresize_high - featuresize_low) / featuresize_high < MD_BUDGET_FEATURE_SIZE_CONVERGENCE_THRESHOLD )
       break;
   }
   
@@ -6746,7 +6752,12 @@ int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int thre
   if( !found_valid_result )
   {
     /* Try progressively more aggressive feature sizes */
-    double aggressive_sizes[] = { featuresize_high, featuresize_high * 2.0, featuresize_high * 5.0, featuresize_high * 10.0 };
+    double aggressive_sizes[] = { 
+      featuresize_high,
+      featuresize_high * MD_BUDGET_AGGRESSIVE_MULTIPLIER_1,
+      featuresize_high * MD_BUDGET_AGGRESSIVE_MULTIPLIER_2,
+      featuresize_high * MD_BUDGET_AGGRESSIVE_MULTIPLIER_3
+    };
     int i;
     
     for( i = 0 ; i < 4 && !found_valid_result ; i++ )
