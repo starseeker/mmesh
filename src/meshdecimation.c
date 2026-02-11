@@ -47,7 +47,7 @@
 ////
 
 /* Enable for debug output in budget decimation */
-#define DEBUG_BUDGET_DECIMATION 1
+#define DEBUG_BUDGET_DECIMATION 0
 
 
 ////
@@ -6595,6 +6595,9 @@ int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int thre
   long start_time, elapsed_time;
   int result;
   int found_valid_result;
+  void *best_vertex_data, *best_indices_data;
+  size_t best_vertex_count, best_tri_count;
+  size_t vertex_data_size, indices_data_size;
   
   /* Use default options if none provided */
   if( !options )
@@ -6617,6 +6620,18 @@ int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int thre
   
   /* Save original operation data for restoration between iterations */
   memcpy( &op_backup, operation, sizeof(mdOperation) );
+  
+  /* Allocate buffers to save best mesh state */
+  vertex_data_size = operation->vertexcount * operation->vertexstride;
+  indices_data_size = operation->tricount * operation->indicesstride;
+  best_vertex_data = malloc( vertex_data_size );
+  best_indices_data = malloc( indices_data_size );
+  if( !best_vertex_data || !best_indices_data )
+  {
+    free( best_vertex_data );
+    free( best_indices_data );
+    return 0;
+  }
   
   /* Estimate mesh scale for feature size bracketing */
   mesh_scale = mdEstimateMeshScale( operation );
@@ -6641,6 +6656,8 @@ int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int thre
   /* Track the best result under budget */
   best_tricount = 0;  /* Start with 0, we want the highest count under budget */
   best_featuresize = featuresize_high;  /* Start with aggressive decimation */
+  best_vertex_count = operation->vertexcount;
+  best_tri_count = operation->tricount;
   found_valid_result = 0;
   
   max_iterations = options->maxiterations;
@@ -6690,9 +6707,15 @@ int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int thre
       
       if( tricount_result > best_tricount )
       {
-        /* This is better (closer to budget) than previous best */
+        /* This is better (closer to budget) than previous best - save mesh state */
         best_tricount = tricount_result;
         best_featuresize = featuresize_mid;
+        best_vertex_count = operation->vertexcount;
+        best_tri_count = operation->tricount;
+        
+        /* Save vertex and index data */
+        memcpy( best_vertex_data, operation->vertex, best_vertex_count * operation->vertexstride );
+        memcpy( best_indices_data, operation->indices, best_tri_count * operation->indicesstride );
       }
       
       /* Check if we're close enough to the target */
@@ -6722,28 +6745,58 @@ int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int thre
   /* If we never found a valid result, try with most aggressive feature size */
   if( !found_valid_result )
   {
-    /* Try with very aggressive feature size */
-    memcpy( operation, &op_backup, sizeof(mdOperation) );
-    operation->featuresize = featuresize_high;
-    result = mdMeshDecimation( operation, threadcount, flags );
-    if( result )
+    /* Try progressively more aggressive feature sizes */
+    double aggressive_sizes[] = { featuresize_high, featuresize_high * 2.0, featuresize_high * 5.0, featuresize_high * 10.0 };
+    int i;
+    
+    for( i = 0 ; i < 4 && !found_valid_result ; i++ )
     {
-      tricount_result = mdCountActiveTriangles( operation );
-      if( tricount_result <= max_triangles )
+      memcpy( operation, &op_backup, sizeof(mdOperation) );
+      operation->featuresize = aggressive_sizes[i];
+      result = mdMeshDecimation( operation, threadcount, flags );
+      if( result )
       {
-        best_tricount = tricount_result;
-        best_featuresize = featuresize_high;
-        found_valid_result = 1;
+        tricount_result = mdCountActiveTriangles( operation );
+        if( tricount_result <= max_triangles )
+        {
+          best_tricount = tricount_result;
+          best_featuresize = aggressive_sizes[i];
+          best_vertex_count = operation->vertexcount;
+          best_tri_count = operation->tricount;
+          found_valid_result = 1;
+          
+          /* Save vertex and index data */
+          memcpy( best_vertex_data, operation->vertex, best_vertex_count * operation->vertexstride );
+          memcpy( best_indices_data, operation->indices, best_tri_count * operation->indicesstride );
+          break;
+        }
+        else if( i == 3 )
+        {
+          /* Last attempt failed - save whatever we got as the best effort */
+          best_tricount = tricount_result;
+          best_featuresize = aggressive_sizes[i];
+          best_vertex_count = operation->vertexcount;
+          best_tri_count = operation->tricount;
+          found_valid_result = 1;  /* Accept result even if over budget */
+          
+          /* Save vertex and index data */
+          memcpy( best_vertex_data, operation->vertex, best_vertex_count * operation->vertexstride );
+          memcpy( best_indices_data, operation->indices, best_tri_count * operation->indicesstride );
+        }
       }
     }
   }
   
-  /* Restore to best result found if we have one */
+  /* Restore best result found if we have one */
   if( found_valid_result )
   {
-    memcpy( operation, &op_backup, sizeof(mdOperation) );
+    /* Restore mesh data from best iteration */
+    memcpy( operation->vertex, best_vertex_data, best_vertex_count * operation->vertexstride );
+    memcpy( operation->indices, best_indices_data, best_tri_count * operation->indicesstride );
+    operation->vertexcount = best_vertex_count;
+    operation->tricount = best_tri_count;
     operation->featuresize = best_featuresize;
-    result = mdMeshDecimation( operation, threadcount, flags );
+    result = 1;
   }
   else
   {
@@ -6751,10 +6804,14 @@ int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int thre
     result = 0;
   }
   
+  /* Free temporary buffers */
+  free( best_vertex_data );
+  free( best_indices_data );
+  
   /* Fill output statistics */
   options->iterationcount = iteration + 1;
   options->finalfeaturesize = best_featuresize;
-  options->finaltricount = result ? mdCountActiveTriangles( operation ) : 0;
+  options->finaltricount = result ? best_tricount : 0;
   
   return result;
 }
