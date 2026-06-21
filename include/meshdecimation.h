@@ -289,6 +289,43 @@ MMESH_EXPORT void mdMeshDecimationThread( mdState *state, int threadindex );
 MMESH_EXPORT void mdMeshDecimationEnd( mdState *state );
 
 
+/* Triangle budget decimation: iteratively adjust feature size to reach target triangle count */
+
+typedef struct
+{
+  /* Maximum number of iterations for binary search ~ default is 20 */
+  int maxiterations;
+  /* Tolerance for triangle count approximation (fraction of target) ~ default is 0.05 (5%) */
+  double tolerance;
+  /* Maximum time limit in milliseconds, 0 for no limit ~ default is 0 */
+  long timelimit;
+  /* Initial feature size estimate (0 for automatic) ~ default is 0 */
+  double initialfeaturesize;
+  
+  /* Output: Actual number of iterations performed */
+  int iterationcount;
+  /* Output: Final feature size used */
+  double finalfeaturesize;
+  /* Output: Final triangle count achieved */
+  long finaltricount;
+} mdBudgetOptions;
+
+/* Initialize mdBudgetOptions with default values */
+MMESH_EXPORT void mdBudgetOptionsInit( mdBudgetOptions *options );
+
+/* Decimate mesh to a target maximum triangle count using iterative feature size adjustment
+ * Returns 1 on success, 0 on failure
+ * The resulting mesh will have tricount <= max_triangles
+ * Parameters:
+ *   operation: mesh operation structure (will be modified during iterations)
+ *   max_triangles: target maximum triangle count (hard cap)
+ *   threadcount: number of threads to use (0 for automatic)
+ *   flags: decimation flags (same as mdMeshDecimation)
+ *   options: optional budget control parameters (NULL for defaults)
+ */
+MMESH_EXPORT int mdMeshDecimationBudget( mdOperation *operation, long max_triangles, int threadcount, int flags, mdBudgetOptions *options );
+
+
 #ifdef __cplusplus
 }
 #endif
