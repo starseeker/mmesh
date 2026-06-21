@@ -1993,13 +1993,13 @@ static mmHashIndex mdEdgeHashEntryKey( void *context, void *entry )
 #if MD_SIZEOF_MDI == 4
  #if MM_HASH_INDEX_64_BITS
   hashkey = ccHash64Int32x2( edge->v[0], edge->v[1] );
- #elif
+ #else
   hashkey = ccHash32Int32x2( edge->v[0], edge->v[1] );
  #endif
 #elif MD_SIZEOF_MDI == 8
  #if MM_HASH_INDEX_64_BITS
   hashkey = ccHash64Int64x2( edge->v[0], edge->v[1] );
- #elif
+ #else
   hashkey = (mmHashIndex)ccHash64Int64x2( edge->v[0], edge->v[1] );
  #endif
 #else
